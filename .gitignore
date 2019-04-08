@@ -2,3 +2,4 @@
 *.pt
 *.npy
 *.pyc
+simulation_data/*

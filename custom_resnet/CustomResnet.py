@@ -510,25 +510,27 @@ def Test(model, device, criterion, test_loader):
 """
 
 def GenerateTrainAndTestDataset(data, labels, divider):
-
+  permuted_indices = torch.randperm(labels.nelement());
+  data_permuted = data[permuted_indices, :, :];
+  labels_permuted = labels[permuted_indices];
   # calculates train and test data size for each class
-  unique_classes, nb_of_occourences = np.unique(labels, return_counts=True);
+  unique_classes, nb_of_occourences = np.unique(labels_permuted, return_counts=True);
   size_of_each_test_class = np.round(nb_of_occourences * divider);
   test_data_size = int(np.sum(size_of_each_test_class))
-  train_data_size = labels.nelement() - test_data_size;
+  train_data_size = labels_permuted.nelement() - test_data_size;
   #init
-  train_data = torch.zeros([train_data_size, data.size()[1], data.size()[2]], dtype=torch.float)
+  train_data = torch.zeros([train_data_size, data_permuted.size()[1], data_permuted.size()[2]], dtype=torch.float)
   train_labels = torch.zeros(train_data_size)
-  test_data = torch.zeros([test_data_size, data.size()[1], data.size()[2]], dtype=torch.float)
+  test_data = torch.zeros([test_data_size, data_permuted.size()[1], data_permuted.size()[2]], dtype=torch.float)
   test_labels = torch.zeros(test_data_size)
   
   train_counter = 0;
   test_counter = 0;
   class_size_counter = torch.zeros(unique_classes.size);
 
-  for i in range(labels.nelement()):
-    spike = data[i, :]
-    label = int(labels[i])
+  for i in range(labels_permuted.nelement()):
+    spike = data_permuted[i, :]
+    label = int(labels_permuted[i])
     # test data
     if(class_size_counter[label] < size_of_each_test_class[label]):
       test_data[test_counter, :] = spike;
@@ -697,3 +699,19 @@ def GetNoiseIndices(path_to_recording, path_to_ground_truth, waveform_length, nb
   noise_indexes = noise_positions[noise_random_indices];
   return torch.unsqueeze(noise_indexes, 0);
   
+  
+class StandartNormalization(object):
+    """StandartNormalization using mean and std
+    meam - mean of spikes
+    std -  std of spikes
+    """
+    def __init__(self, mean, std):
+      self.mean = mean;
+      self.std = std;
+    """ recording """  
+    def __call__(self, waveforms):
+      spike_mean = self.mean.repeat(waveforms.__len__());
+      spike_std = self.std.repeat(waveforms.__len__());
+      transform = transforms.Compose([transforms.Normalize(spike_mean, spike_std)]);
+      normalized_wavefroms = transform(waveforms)
+      return normalized_wavefroms;
