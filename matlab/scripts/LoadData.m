@@ -5,15 +5,16 @@ function [data] = LoadData(directory_path, file_name)
         files =  dir(directory_path);
         file_name = {files.name}';
         file_name(1:2) = [];
-        vertices = cell(size(file_name, 1), 1);
-        faces = cell(size(file_name, 1), 1);
+        data = cell(size(file_name, 1), 1);
         parfor i = 1:size(file_name,1)
-            full_path = fullfile(directory_path, file_name{i});
+            file_name = "simulation_" + i + ".mat";
+            full_path = fullfile(directory_path, file_name);
             data{i} = load(full_path)
         end
     % loads single data
     else
+        data = {};
         full_path = fullfile(directory_path, file_name);
-        data{i} = load(full_path)
+        data{end + 1} = load(full_path)
     end
 end

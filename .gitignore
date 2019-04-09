@@ -3,3 +3,4 @@
 *.npy
 *.pyc
 simulation_data/*
+*.mat
