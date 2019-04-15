@@ -112,10 +112,10 @@ for i = 1:nb_of_datasets
 end
 
 
-dataset = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/datasets_11.npy");
-gd = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/ground_truth_data_multiunit_11.npy");
+dataset = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/datasets_1.npy");
+gd = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/ground_truth_data_multiunit_1.npy");
 
 for i=1:size(gd, 2)
-    plot(dataset(gd(1, 44885) +1 -32:gd(1, 44885) +1 + 32));
-    pause
+    plot(dataset(gd(1, i) +1 -32:gd(1, i) +1 + 32)));
+    
 end
