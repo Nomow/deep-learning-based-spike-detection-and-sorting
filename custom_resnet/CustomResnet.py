@@ -758,11 +758,12 @@ class MovingWeightedMeanAndStdNormalization(object):
         else:
           moving_mean[i] = moving_mean[i - 1] * (1 - self.weight) + torch.mean(data_subset) * self.weight;
           moving_std[i] = moving_std[i - 1] * (1 - self.weight) + torch.std(data_subset) * self.weight;
-        
         normalized_data[0, ind_from:ind_to] = (data_subset - moving_mean[i]) / moving_std[i];
         ind_from = ind_to;
         ind_to = ind_to + self.window_size;
       # centers data
+      print(normalized_data[0, 0:100])
+      print(torch.mean(normalized_data))
       normalized_data = normalized_data - torch.mean(normalized_data);
       return normalized_data;
 
