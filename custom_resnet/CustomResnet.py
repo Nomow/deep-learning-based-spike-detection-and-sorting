@@ -368,16 +368,17 @@ class SpikeTrainDataset(Dataset):
     waveform_length - waveform length to be extracted
     snr_ratio_db - signal to noise ratio in decibels
     shift_indexes - int tensor of indices to shift original position of spike
-    flip_data - flip data horizontally
+    flip_data_horizontal - flip data horizontally
+    flip_data_vertical - flip_data vertically by changing value sign
 """
 def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
                 snr_ratio_db=None, shift_indexes = torch.IntTensor(),
-                flip_data = False):
+                flip_data_horizontal = False, flip_data_vertical = False):
   
   transform = None;
   # adds noise
   if (snr_ratio_db != None):
-    transform = transforms.Compose([Awgn(snr_ratio_db)]);
+    transform = transforms.Compose([Awgn(snr_ratio_db), MovingWeightedMeanAndStdNormalization(1000)]);
   recording = Recording(path_to_recording, transform=transform);
   
   
@@ -392,9 +393,13 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
       
   transform = transforms.Compose([ExtractWaveforms(ground_truth.data, waveform_length)]);
   waveforms = transform(recording.data);
-  if (flip_data == True):
+  if (flip_data_horizontal == True):
     transform = transforms.Compose([FlipData([2])]);
     waveforms = transform(waveforms);
+    
+  if (flip_data_vertical == True):
+    waveforms = -1 * waveforms;
+
   dataset = SpikeTrainDataset(waveforms, ground_truth.data[1, :])
   return dataset;
 
@@ -437,16 +442,19 @@ def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, ma
     print("shift_step: ", shift_step)
     print("shift_indexes: ", shift_indexes)
     print("snr_ratio: ", snr_ratio_db)
-    flip_data = np.random.randint(1, 3)
-    print("flip_data", flip_data)
-    # generates flipped data
-    for j in range(0, flip_data):
-      temp = AugmentData(path_to_recording, path_to_ground_truth, waveform_length, snr_ratio_db = snr_ratio_db, shift_indexes = shift_indexes, flip_data = j);
-      temp_dataset = torch.utils.data.ConcatDataset((temp_dataset,temp));
-      print("temp_dataset_len_after: ", j, temp_dataset.__len__());
+    flip_data_horizontal = np.random.randint(0, 2)
+    flip_data_vertical = np.random.randint(0, 2)
 
-    dataset = torch.utils.data.ConcatDataset((dataset,temp_dataset));
-    print("dataset len: ", j, dataset.__len__());
+    print("flip_data_horz: ", flip_data_horizontal)
+    print("flip_data_vert: ", flip_data_vertical)
+    # generates flipped data
+    for j in range(0, 2):
+      temp = AugmentData(path_to_recording, path_to_ground_truth, waveform_length, snr_ratio_db = snr_ratio_db, shift_indexes = shift_indexes, flip_data_horizontal = flip_data_horizontal, flip_data_vertical = j);
+      temp_dataset = torch.utils.data.ConcatDataset((temp_dataset,temp));
+      print("temp_dataset_len_after: ", temp_dataset.__len__());
+
+    dataset = torch.utils.data.ConcatDataset((dataset, temp_dataset));
+    print("dataset len: ", dataset.__len__());
     i = i + 1;
   return dataset;
 
@@ -715,3 +723,46 @@ class StandartNormalization(object):
       transform = transforms.Compose([transforms.Normalize(spike_mean, spike_std)]);
       normalized_wavefroms = transform(waveforms)
       return normalized_wavefroms;
+
+
+    
+class MovingWeightedMeanAndStdNormalization(object):
+  
+    """Normalizes data by using moving mean and std
+    window_size - window size of nb of elements
+    weight - weight param to update the current mean and std
+
+    """
+    def __init__(self, window_size, weight = 0.001):
+      self.window_size = window_size;
+      self.weight = weight;
+    """ recording """  
+    def __call__(self, data):
+      ind_from = 0;
+      ind_to = self.window_size;
+      nb_of_steps = int(np.floor(data.nelement() / self.window_size));
+      moving_mean = torch.zeros((nb_of_steps, 1));
+      moving_std = torch.zeros((nb_of_steps, 1));
+      normalized_data = torch.zeros((1, data.nelement()));
+      print(data.nelement());
+      for i in range(nb_of_steps):
+        # takes window of data
+        if (ind_to > data.nelement()):
+          ind_to = data.nelement();  
+        data_subset = data[0, ind_from:ind_to];
+          
+        # moving mean and std calculation
+        if (i == 0):
+          moving_mean[i] = torch.mean(data_subset);
+          moving_std[i] = torch.std(data_subset);
+        else:
+          moving_mean[i] = moving_mean[i - 1] * (1 - self.weight) + torch.mean(data_subset) * self.weight;
+          moving_std[i] = moving_std[i - 1] * (1 - self.weight) + torch.std(data_subset) * self.weight;
+        
+        normalized_data[0, ind_from:ind_to] = (data_subset - moving_mean[i]) / moving_std[i];
+        ind_from = ind_to;
+        ind_to = ind_to + self.window_size;
+      # centers data
+      normalized_data = normalized_data - torch.mean(normalized_data);
+      return normalized_data;
+
