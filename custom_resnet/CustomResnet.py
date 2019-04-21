@@ -13,6 +13,7 @@ from torchvision import models
 from torchsummary import summary
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, datasets
+from scipy import signal
 
 def conv1x3(in_planes, out_planes, stride=1):
     return nn.Conv1d(in_planes, out_planes, kernel_size=3, stride=stride,
@@ -373,14 +374,17 @@ class SpikeTrainDataset(Dataset):
 """
 def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
                 snr_ratio_db=None, shift_indexes = torch.IntTensor(),
-                flip_data_horizontal = False, flip_data_vertical = False):
+                flip_data_horizontal = False):
   
-  transform = None;
+  transform_list_recording = [];
   # adds noise
   if (snr_ratio_db != None):
-    transform = transforms.Compose([Awgn(snr_ratio_db), MovingWeightedMeanAndStdNormalization(1000)]);
-  recording = Recording(path_to_recording, transform=transform);
-  
+    transform_list_recording.append(Awgn(snr_ratio_db));
+  # adds noise and mean, std normalization normalization transform
+  transform_list_recording.append(FilterSignalUsingButtersWorth('high', 24000, np.array([100], dtype=int), 1));
+  transform_list_recording.append(MovingMeanAndStdNormalization(1200));
+  transform = transforms.Compose(transform_list_recording);
+  recording = Recording(path_to_recording, transform = transform);
   
   # shifts data
   if (shift_indexes.nelement() != 0):
@@ -396,9 +400,6 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
   if (flip_data_horizontal == True):
     transform = transforms.Compose([FlipData([2])]);
     waveforms = transform(waveforms);
-    
-  if (flip_data_vertical == True):
-    waveforms = -1 * waveforms;
 
   dataset = SpikeTrainDataset(waveforms, ground_truth.data[1, :])
   return dataset;
@@ -443,17 +444,12 @@ def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, ma
     print("shift_indexes: ", shift_indexes)
     print("snr_ratio: ", snr_ratio_db)
     flip_data_horizontal = np.random.randint(0, 2)
-    flip_data_vertical = np.random.randint(0, 2)
 
     print("flip_data_horz: ", flip_data_horizontal)
-    print("flip_data_vert: ", flip_data_vertical)
     # generates flipped data
-    for j in range(0, 2):
-      temp = AugmentData(path_to_recording, path_to_ground_truth, waveform_length, snr_ratio_db = snr_ratio_db, shift_indexes = shift_indexes, flip_data_horizontal = flip_data_horizontal, flip_data_vertical = j);
-      temp_dataset = torch.utils.data.ConcatDataset((temp_dataset,temp));
-      print("temp_dataset_len_after: ", temp_dataset.__len__());
+    temp = AugmentData(path_to_recording, path_to_ground_truth, waveform_length, snr_ratio_db = snr_ratio_db, shift_indexes = shift_indexes, flip_data_horizontal = flip_data_horizontal);
 
-    dataset = torch.utils.data.ConcatDataset((dataset, temp_dataset));
+    dataset = torch.utils.data.ConcatDataset((dataset, temp));
     print("dataset len: ", dataset.__len__());
     i = i + 1;
   return dataset;
@@ -726,44 +722,42 @@ class StandartNormalization(object):
 
 
     
-class MovingWeightedMeanAndStdNormalization(object):
+class MovingMeanAndStdNormalization(object):
   
     """Normalizes data by using moving mean and std
     window_size - window size of nb of elements
-    weight - weight param to update the current mean and std
-
     """
-    def __init__(self, window_size, weight = 0.001):
+    def __init__(self, window_size):
       self.window_size = window_size;
-      self.weight = weight;
     """ recording """  
     def __call__(self, data):
-      ind_from = 0;
-      ind_to = self.window_size;
-      nb_of_steps = int(np.floor(data.nelement() / self.window_size));
-      moving_mean = torch.zeros((nb_of_steps, 1));
-      moving_std = torch.zeros((nb_of_steps, 1));
-      normalized_data = torch.zeros((1, data.nelement()));
-      print(data.nelement());
-      for i in range(nb_of_steps):
-        # takes window of data
-        if (ind_to > data.nelement()):
-          ind_to = data.nelement();  
-        data_subset = data[0, ind_from:ind_to];
-          
-        # moving mean and std calculation
-        if (i == 0):
-          moving_mean[i] = torch.mean(data_subset);
-          moving_std[i] = torch.std(data_subset);
-        else:
-          moving_mean[i] = moving_mean[i - 1] * (1 - self.weight) + torch.mean(data_subset) * self.weight;
-          moving_std[i] = moving_std[i - 1] * (1 - self.weight) + torch.std(data_subset) * self.weight;
-        normalized_data[0, ind_from:ind_to] = (data_subset - moving_mean[i]) / moving_std[i];
-        ind_from = ind_to;
-        ind_to = ind_to + self.window_size;
-      # centers data
-      print(normalized_data[0, 0:100])
-      print(torch.mean(normalized_data))
-      normalized_data = normalized_data - torch.mean(normalized_data);
-      return normalized_data;
-
+      print("started movingmeanandstd")
+      mean = torch.zeros((data.nelement(), 1));
+      std = torch.zeros((data.nelement(), 1));
+      window_div = self.window_size // 2;
+      for i in range(data.nelement()):
+        ind_from = np.max([-1 * window_div + i, 0]);
+        ind_to = np.min([i + window_div, data.nelement()]);
+        mean[i] = data[0, ind_from:ind_to].detach().mean();
+        std[i] = data[0, ind_from:ind_to].detach().std();
+      return (data - mean) / std;
+      print("done movingmeanandstd")
+class FilterSignalUsingButtersWorth(object):
+    """filters signal using buttersworth filter type
+        filter_type - type of filter - lowpass highpass, bandpass
+        sampling_frequency - sampling frequency of signal
+        freq_range - passband frequency and/or stopband frequency range '('array')'
+        order - order of filter
+    """
+    def __init__(self, filter_type, sampling_frequency, freq_range, order):
+        self.filter_type = filter_type;
+        self.sampling_frequency = sampling_frequency;
+        self.freq_range = freq_range;
+        self.order = order;
+    """ recording """  
+    def __call__(self, data):
+        normalized_freq =  2 * self.freq_range / self.sampling_frequency
+        b, a = signal.butter(self.order, normalized_freq, btype=self.filter_type);
+        print(b, a)
+        filtered_data = signal.filtfilt(b, a,  data.numpy(),  padlen  = 3*(max(len(b),len(a))-1));
+        return torch.FloatTensor(filtered_data.copy());

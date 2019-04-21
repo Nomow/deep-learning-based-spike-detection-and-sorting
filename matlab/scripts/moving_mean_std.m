@@ -1,56 +1,71 @@
 recording_synthesized = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/datasets_1.npy");
+spikes = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/ground_truth_data_multiunit_1.npy");
+spikes = spikes + 1;
 load('/home/vtpc/Documents/Alvils/spike-sorting/data/BOU_JO_Localizer6Hz_sessions','femicro','micros2');
-recording_eeg = reshape(micros2(1:32,:, 1), [], 1)';
+%recording =  micros2(16,:, 1); fs = 30000;
+recording = recording_synthesized; fs = 24000;
 
 
-
-mean_sub_synth = (recording_synthesized - mean(recording_synthesized)) / std(recording_synthesized);
-mean_sub_eeg = (recording_eeg - mean(recording_eeg)) / std(recording_eeg);
-
-Fb=300;
-Fh=6000;
-[b,a]=butter(1,[2*Fb/30000], 'high'); % femicro: sampling frequency (24kHz)
-
+Fb=100;
+[b,a]=butter(1,[2*Fb/fs], 'high'); % femicro: sampling frequency (24kHz)
+%bdata = data * - 1;
 % filtrage du signal:
-LFPh=filtfilt(b,a,recording_eeg')';
+LFPh=filtfilt(b,a,recording')';
 
 
-window_size = 1000;
-from = 1;
-to = window_size;
-nb_of_steps = ceil(size(recording_synthesized, 2) / window_size) 
-recording_size = size(recording_synthesized, 2);
-current_mean = zeros(nb_of_steps, 1);
-current_std = zeros(nb_of_steps, 1);
-temp_recording = recording_synthesized;
-current_median = zeros(nb_of_steps, 1);
-for i = 1:nb_of_steps
-    weight = 0.001 ;
-    %avg i = 0
-    if (i == 1)
-        current_mean(1) = mean(temp_recording(from:to));
-        current_std(i) = std(temp_recording(from:to));
-        temp_recording(from:to) = (temp_recording(from:to) - current_mean(i)) / current_std(i);
+d = 850000;
+s = d + 100000;
 
-   
-    elseif (to < recording_size)
-        temp = mean(temp_recording(from:to)) * weight;
-        temp_std = std(temp_recording(from:to)) * weight; 
-        current_mean(i) = current_mean(i - 1) * (1 - weight) + temp;
-        current_std(i) = current_std(i - 1) * (1 - weight) + temp_std;
-        temp_recording(from:to) = (temp_recording(from:to) - current_mean(i)) / current_std(i);
+mov_mean = movmean(LFPh,1000);
+mov_std = movstd(LFPh,1000);
+mov_med = movmad(LFPh, 72);
+normalized = (LFPh - mov_mean) ./ mov_std;
+normalized_med = (LFPh - mov_med) ./ 0.6745;
+norm1 = (LFPh - mean(LFPh)) ./ std(LFPh);
+snr(normalized)
+figure 
+n = normalized ./ max(abs(normalized(d:s))) ;
+plot(normalized(d:s))
+hold
+plot( index(find(index < s & index > d)) -d  - 1, normalized(1, index(find(index < s & index > d))), '*')
+t = n(1, index(find(index < s & index > d)));
 
-    else
-        temp = mean(temp_recording(from:end)) * weight;
-        temp_std = std(temp_recording(from:end)) * weight; 
-        current_mean(i) = current_mean(i - 1) * (1 - weight) + temp;
-        current_std(i) = current_std(i - 1) * (1 - weight) + temp_std;
-        temp_recording(from:end) = (temp_recording(from:end) - current_mean(i)) / current_std(i);
+figure 
+nm = normalized_med ./ max(abs(normalized_med(d:s)));
 
-    end
-    from = to + 1;
-    to = to + window_size;
+plot(normalized_med(d:s))
+hold
+plot( index(find(index < s & index > d)) -d  - 1, normalized_med(1, index(find(index < s & index > d))), '*')
+t1 = nm(1, index(find(index < s & index > d)));
+
+
+figure 
+hold
+plot(n(d:s))
+plot(nm(d:s))
+
+
+
+index_multi(find(index_multi < s & index_multi > d))
+
+
+
+
+
+
+
+
+start = spike_first_sample{1};
+index = zeros(length(start), 1);
+for i = 1:length(index)
+    [~, argmax] = max(abs(data(1, start(i):start(i) + 72)));
+    index(i) = argmax - 1 + start(i);
 end
 
-mean_sub_rec = (temp_recording - mean(temp_recording));
-std(mean_sub_rec)
+
+start_multi = spike_first_sample{1}(find((spike_classes{1} == 0)));
+index_multi = zeros(length(start_multi), 1);
+for i = 1:length(index_multi)
+    [~, argmax] = max(abs(data(1, start_multi(i):start_multi(i) + 72)));
+    index_multi(i) = argmax - 1 + start_multi(i);
+end

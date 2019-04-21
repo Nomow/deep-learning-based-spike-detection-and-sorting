@@ -1,14 +1,27 @@
-load("datasets_3_result4.5_sc2.mat");
-original_result = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/ground_truth_data_multiunit_3.npy");
-cnn_result = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/models/resnet_multi/results/datasets_3_results.npy");
-original_result = original_result(1,:)';
-cnn_result = cnn_result + 1;
-original_result = original_result + 1;
+load('BOU_JO_Localizer6Hz_sessions','femicro','micros2');
+sess=1; % choose one of the two sessions
 
-cnn_original_tp = find(ismember(original_result,cnn_result) == 1);
-cnn_original_fp = find(ismember(cnn_result,original_result) == 0);
-static_original_tp = find(ismember(original_result,result') == 1);
-static_original_fp = find(ismember(result',original_result) == 0);
+dataset = [];
+for i =1 :size(micros2, 1)
+   dataset = [dataset, micros2(i, :, sess)];
+end
+dataset_ind = gpuArray(0:size(dataset,2)-1);
+dataset_val = gpuArray(dataset);
+interp_val = gpuArray(0:1.25:size(dataset,2)-1);
+interp_dataset = interp1(dataset_ind, dataset_val, interp_val, 'spline');
+cpu_interp = gather(interp_dataset);
 
-acc_static = size(static_original_tp, 1) / size(original_result, 1)
-acc_cnn = size(cnn_original_tp, 1) / size(original_result, 1)
+result1 = detect1(micros2(:, :, sess), 24000);
+result2 = detect2(dataset, 24000);
+spikes_in_both_datasets = find(ismember(result1, result2) == 1);
+spikes = result1(spikes_in_both_datasets)
+spikes1 = result1(find(ismember(result1, result2) == 0));
+spikes2 = result2(find(ismember(result2, result1) == 0));
+spikes3 = [spikes1, spikes2];
+rnd = randi([1 size(spikes3, 2)],1, floor(size(spikes3, 2) * 0.25));
+spikes = [spikes, spikes3(rnd)];
+spikes = spikes-1;
+gd = ones(size(spikes));
+concat_spikes = [spikes; gd];
+writeNPY(concat_spikes, "ground_truth_rec1.npy");
+writeNPY(cpu_interp, "datasets_rec1.npy");

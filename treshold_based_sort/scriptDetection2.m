@@ -1,9 +1,10 @@
 load('BOU_JO_Localizer6Hz_sessions','femicro','micros2');
-
-recording = micros2(1,:, 1);
-recording_syn
-
 sess=1; % choose one of the two sessions
+
+dataset = [];
+for i =1 :size(micros2, 1)
+   dataset = [dataset, micros2(i, :, sess)];
+end
 
 % Band-Pass filtering in the range 300-6000Hz
 Fb=300;
@@ -11,11 +12,7 @@ Fh=6000;
 [b,a]=butter(1,[2*Fb/femicro 2*Fh/femicro]); % femicro: sampling frequency (24kHz)
 
 % filtrage du signal:
-LFPh=filtfilt(b,a,micros2(:, :, sess)')';
-
-s = spectrogram(LFPh(1,  1:10000) - mean(LFPh(1,  1:10000)));
-spectrogram(LFPh(1, 1:10000) - mean(LFPh(1, 1:10000)),256,250,256,30000,'yaxis')
-
+LFPh=filtfilt(b,a,dataset')';
 
 %% spike count all: detection � la Quiroga + art detection
 ns=femicro/1000*3; %dur�e d'un spike en �chantillon (3ms)
@@ -90,8 +87,10 @@ for imicro=1:size(LFPh,1)
 %     plot(ideltas,LFPh(imicro,ideltas),'r*');
     
 end
-max_amplitude = find(deltas(1,:));  
+result2 = find(deltas(1,:));
 
-%result = find(deltas == 1);
-%clearvars -except result file_name
-%save(file_name+ "_result4.5_sc2.mat")
+
+for i =1:size(result2, 2)
+    plot(LFPh(1, result2(i) - 45:result2(i) +  45))
+    pause
+end

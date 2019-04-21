@@ -1,0 +1,55 @@
+%% data loading
+path_to_data = "/home/vtpc/Documents/Alvils/spike-sorting/data/raw";
+path_to_ground_truth = "/home/vtpc/Documents/Alvils/spike-sorting/data";
+path_to_save = "/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets";
+recordings = LoadData(path_to_data);
+ground_truth = LoadData(path_to_ground_truth, "ground_truth.mat");
+
+%% 
+nb_of_recordings = size(recordings, 1);
+waveform_length = 72;
+for i = 1:nb_of_recordings
+    data = recordings{i}.data * -1;
+    file_name = "datasets_single" + i + ".npy";
+    save_path_data = fullfile(path_to_save, file_name);
+    writeNPY(data, save_path_data)
+
+    start = ground_truth{1}.spike_first_sample{i};
+    index = zeros(1,length(start));
+    neuron = ground_truth{1}.spike_classes{i} + 1;
+    for j = 1:length(index)
+        from = start(j);
+        to = start(j) + waveform_length;
+        if(to > size(data,2))
+            to = size(data,2);
+        end
+        [~, argmax] = max(abs(data(1, from:to)));
+        index(j) = argmax - 1 + start(j) - 1;
+    end
+    indices_higher_than_recording = find(index - waveform_length / 2 >= 0 & index + waveform_length / 2 < size(data, 2));
+    to_remove = find(indices_higher_than_recording == 0);
+    if(~isempty(to_remove))
+        index(to_remove) = [];
+        neuron(to_remove) = [];
+    end
+        
+
+    
+    
+    spike_train = [index; neuron];
+    file_name_gd = "single_recording_gd" + i + ".npy";
+    save_path_gd = fullfile(path_to_save, file_name_gd);
+    writeNPY(spike_train, save_path_gd)
+end
+
+
+a = ground_truth{1}.spike_first_sample
+max_size = 0
+index = 0
+for i = 1:size(a, 2)
+    if(max_size < size(a{1}, 2))
+        
+    end
+    
+end
+
