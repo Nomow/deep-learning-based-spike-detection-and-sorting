@@ -382,7 +382,7 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
     transform_list_recording.append(Awgn(snr_ratio_db));
   # adds noise and mean, std normalization normalization transform
   transform_list_recording.append(FilterSignalUsingButtersWorth('high', 24000, np.array([100], dtype=int), 1));
-  transform_list_recording.append(MovingMeanAndStdNormalization(1200));
+  transform_list_recording.append(MovingMeanAndStdNormalization(1000));
   transform = transforms.Compose(transform_list_recording);
   recording = Recording(path_to_recording, transform = transform);
   
@@ -413,7 +413,7 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
 """
 def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, max_dataset_size):
   i = 0;
-  snr_from = 5;
+  snr_from = 4;
   snr_to = 30
   dataset = SpikeTrainDataset();
   max_shift = waveform_length  // 4 # +- shift
@@ -434,7 +434,7 @@ def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, ma
       shift_from = -1 * max_shift
       shift_to = max_shift + 1;
       snr_ratio_db = None;
-    shift_step = np.random.randint(1, 5);
+    shift_step = np.random.randint(1, 3);
     shift_indexes = torch.tensor(np.arange(shift_from, shift_to, shift_step)).int();
 
 
@@ -732,14 +732,14 @@ class MovingMeanAndStdNormalization(object):
     """ recording """  
     def __call__(self, data):
       print("started movingmeanandstd")
-      mean = torch.zeros((data.nelement(), 1));
-      std = torch.zeros((data.nelement(), 1));
+      mean = torch.zeros((1, data.nelement()));
+      std = torch.zeros((1, data.nelement()));
       window_div = self.window_size // 2;
       for i in range(data.nelement()):
         ind_from = np.max([-1 * window_div + i, 0]);
         ind_to = np.min([i + window_div, data.nelement()]);
-        mean[i] = data[0, ind_from:ind_to].detach().mean();
-        std[i] = data[0, ind_from:ind_to].detach().std();
+        mean[0, i] = data[0, ind_from:ind_to].mean();
+        std[0, i] = data[0, ind_from:ind_to].std();
       return (data - mean) / std;
       print("done movingmeanandstd")
 class FilterSignalUsingButtersWorth(object):
