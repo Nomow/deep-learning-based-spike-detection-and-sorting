@@ -81,7 +81,7 @@ for imicro=1:size(LFPh,1)
     
 end
 Ns
-result = find(deltas(1,:));
+result = find(deltas(1,:) == 1);
 
 
 end

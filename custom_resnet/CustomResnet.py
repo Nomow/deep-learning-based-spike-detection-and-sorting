@@ -382,7 +382,6 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
     transform_list_recording.append(Awgn(snr_ratio_db));
   # adds noise and mean, std normalization normalization transform
   transform_list_recording.append(FilterSignalUsingButtersWorth('high', 24000, np.array([100], dtype=int), 1));
-  transform_list_recording.append(MovingMeanAndStdNormalization(1000));
   transform = transforms.Compose(transform_list_recording);
   recording = Recording(path_to_recording, transform = transform);
   
@@ -393,7 +392,7 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
   else:    
     ground_truth = GroundTruth(path_to_ground_truth);
 
-      
+  recording = MovingMeanAndTsdNormalizationOnSpikesOnly(recording, ground_truth, waveform_length, 1000)    
       
   transform = transforms.Compose([ExtractWaveforms(ground_truth.data, waveform_length)]);
   waveforms = transform(recording.data);
@@ -413,7 +412,7 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
 """
 def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, max_dataset_size):
   i = 0;
-  snr_from = 4;
+  snr_from = 3;
   snr_to = 30
   dataset = SpikeTrainDataset();
   max_shift = waveform_length  // 4 # +- shift
@@ -427,14 +426,12 @@ def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, ma
     # first iteration awgn is not used
     if (i != 0):
       snr_ratio_db = np.random.randint(snr_from, snr_to + 1) + np.random.uniform();
-      # calculates shift from __ to
-      shift_from = np.random.randint(- 1 * max_shift, 1);
-      shift_to = np.random.randint(0, max_shift + 1);
     else:
-      shift_from = -1 * max_shift
-      shift_to = max_shift + 1;
       snr_ratio_db = None;
-    shift_step = np.random.randint(1, 3);
+    # calculates shift from __ to
+    shift_from = - 1 * max_shift;
+    shift_to = max_shift + 1;
+    shift_step = np.random.randint(1, 5);
     shift_indexes = torch.tensor(np.arange(shift_from, shift_to, shift_step)).int();
 
 
@@ -721,6 +718,39 @@ class StandartNormalization(object):
       return normalized_wavefroms;
 
 
+    
+def MovingMeanAndTsdNormalizationOnSpikesOnly(recording, ground_truth, waveform_length, window_size):
+  
+    """Normalizes data by using moving mean and std
+    window_size - window size of nb of elements
+    recoridng - recording of dataset
+    ground_truth - ground truth data
+    waveform_length - wavefroms length of spike
+    """
+    # extracts unique waveform indices
+    waveform_div = waveform_length // 2;
+    indices = ground_truth.data[0, :];
+    spike_indices = torch.zeros((indices.nelement(), waveform_length), dtype=torch.int);
+    for i in range(indices.nelement()):
+      curr_max_amplitude_index = indices[i];
+      waveform_from = curr_max_amplitude_index - waveform_div;
+      waveform_to = curr_max_amplitude_index + waveform_div;
+      spike_indices[i, :] = torch.arange(waveform_from, waveform_to);
+    unique_spike_indices = spike_indices.view(-1).unique();
+
+    data = recording.data.clone();
+
+    # moving mean std
+    window_div = window_size // 2;
+    for i in range(unique_spike_indices.nelement()):
+      curr_max_amplitude_index = unique_spike_indices[i];
+      ind_from = np.max([-1 * window_div + curr_max_amplitude_index, 0]);
+      ind_to = np.min([curr_max_amplitude_index + window_div, data.nelement()]);
+      mean = recording.data[0, ind_from:ind_to].mean();
+      std = recording.data[0, ind_from:ind_to].std();
+      data[0, curr_max_amplitude_index]  = (data[0, curr_max_amplitude_index] - mean) / std;
+    recording.data = data;
+    return recording;
     
 class MovingMeanAndStdNormalization(object):
   

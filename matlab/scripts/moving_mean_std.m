@@ -2,8 +2,8 @@ recording_synthesized = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/
 spikes = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/ground_truth_data_multiunit_1.npy");
 spikes = spikes + 1;
 load('/home/vtpc/Documents/Alvils/spike-sorting/data/BOU_JO_Localizer6Hz_sessions','femicro','micros2');
-%recording =  micros2(16,:, 1); fs = 30000;
-recording = recording_synthesized; fs = 24000;
+recording =  micros2(16,:, 1); fs = 30000;
+%recording = recording_synthesized; fs = 24000;
 
 
 Fb=100;
@@ -13,8 +13,8 @@ Fb=100;
 LFPh=filtfilt(b,a,recording')';
 
 
-d = 850000;
-s = d + 100000;
+d = 1;
+s = size(LFPh, 2);
 
 mov_mean = movmean(LFPh,1000);
 mov_std = movstd(LFPh,1000);
@@ -22,7 +22,6 @@ mov_med = movmad(LFPh, 72);
 normalized = (LFPh - mov_mean) ./ mov_std;
 normalized_med = (LFPh - mov_med) ./ 0.6745;
 norm1 = (LFPh - mean(LFPh)) ./ std(LFPh);
-snr(normalized)
 figure 
 n = normalized ./ max(abs(normalized(d:s))) ;
 plot(normalized(d:s))

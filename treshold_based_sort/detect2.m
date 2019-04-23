@@ -39,8 +39,7 @@ LFPh=filtfilt(b,a,dataset')';
          imua=unique([(find(itmp3)+1),find(itmp3)]); % indices of too 
          end
      end
-  result = find(rastMUA2 == 1)
-
+  result = find(rastMUA2 == 1);
 
 end
 
