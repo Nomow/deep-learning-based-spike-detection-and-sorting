@@ -382,6 +382,9 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
     transform_list_recording.append(Awgn(snr_ratio_db));
   # adds noise and mean, std normalization normalization transform
   transform_list_recording.append(FilterSignalUsingButtersWorth('high', 24000, np.array([100], dtype=int), 1));
+
+  transform_list_recording.append(OptimizedZScoreNormalizaton());
+
   transform = transforms.Compose(transform_list_recording);
   recording = Recording(path_to_recording, transform = transform);
   
@@ -392,7 +395,7 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
   else:    
     ground_truth = GroundTruth(path_to_ground_truth);
 
-  recording = MovingMeanAndTsdNormalizationOnSpikesOnly(recording, ground_truth, waveform_length, 1000)    
+  #recording = MovingMeanAndTsdNormalizationOnSpikesOnly(recording, ground_truth, waveform_length, 1000)    
       
   transform = transforms.Compose([ExtractWaveforms(ground_truth.data, waveform_length)]);
   waveforms = transform(recording.data);
@@ -424,15 +427,14 @@ def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, ma
 
 
     # first iteration awgn is not used
-    if (i != 0):
-      snr_ratio_db = np.random.randint(snr_from, snr_to + 1) + np.random.uniform();
-    else:
-      snr_ratio_db = None;
+    snr_ratio_db = np.random.randint(snr_from, snr_to + 1) + np.random.uniform();
+ 
     # calculates shift from __ to
     shift_from = - 1 * max_shift;
     shift_to = max_shift + 1;
     shift_step = np.random.randint(1, 5);
     shift_indexes = torch.tensor(np.arange(shift_from, shift_to, shift_step)).int();
+
 
 
     print("shift_from: ", shift_from)
@@ -733,6 +735,7 @@ def MovingMeanAndTsdNormalizationOnSpikesOnly(recording, ground_truth, waveform_
     spike_indices = torch.zeros((indices.nelement(), waveform_length), dtype=torch.int);
     for i in range(indices.nelement()):
       curr_max_amplitude_index = indices[i];
+      print("curr_index:", curr_max_amplitude_index);
       waveform_from = curr_max_amplitude_index - waveform_div;
       waveform_to = curr_max_amplitude_index + waveform_div;
       spike_indices[i, :] = torch.arange(waveform_from, waveform_to);
@@ -744,11 +747,13 @@ def MovingMeanAndTsdNormalizationOnSpikesOnly(recording, ground_truth, waveform_
     window_div = window_size // 2;
     for i in range(unique_spike_indices.nelement()):
       curr_max_amplitude_index = unique_spike_indices[i];
-      ind_from = np.max([-1 * window_div + curr_max_amplitude_index, 0]);
+      ind_from = np.max([curr_max_amplitude_index - window_div, 0]);
       ind_to = np.min([curr_max_amplitude_index + window_div, data.nelement()]);
       mean = recording.data[0, ind_from:ind_to].mean();
       std = recording.data[0, ind_from:ind_to].std();
       data[0, curr_max_amplitude_index]  = (data[0, curr_max_amplitude_index] - mean) / std;
+      print("curr_max_amplitude_index: ", curr_max_amplitude_index, "from: ", ind_from, ind_to, "mean std: ", mean, std, "data: ", data[0, curr_max_amplitude_index])
+
     recording.data = data;
     return recording;
     
@@ -791,3 +796,14 @@ class FilterSignalUsingButtersWorth(object):
         print(b, a)
         filtered_data = signal.filtfilt(b, a,  data.numpy(),  padlen  = 3*(max(len(b),len(a))-1));
         return torch.FloatTensor(filtered_data.copy());
+
+from scipy import stats
+class OptimizedZScoreNormalizaton(object):
+    """optimized z-score normalization """
+    """ recording """  
+    def __call__(self, data):
+      median = data.median();
+      median_abs_dev = torch.median((data - data.median()).abs());
+      normalized_data = 0.6745 * (data - median) / median_abs_dev;
+      return torch.FloatTensor(normalized_data);
+
