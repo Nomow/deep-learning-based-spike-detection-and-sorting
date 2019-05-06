@@ -23,7 +23,7 @@ end
 % saves datasets
 nb_of_datasets = size(datasets, 2)
 for i = 1:nb_of_datasets
-    file_name = "datasets_" + i + ".npy";
+    file_name = "data_" + i + ".npy";
     save_path = fullfile(path_to_save, file_name);
     writeNPY(datasets{i}, save_path)
 end
@@ -48,7 +48,7 @@ end
 
 % saves ground truth
 for i = 1:nb_of_datasets
-    file_name = "ground_truth_" + i + ".mat";
+    file_name = "groun_truth" + i + ".mat";
     save_path = fullfile(path_to_save, file_name);
     data = dataset_ground_truth{i}
     save(save_path, 'data');

@@ -281,6 +281,7 @@ class ShiftData(object):
       waveform_div = self.waveform_length // 2;
       spike_max_amplitude_index_size = data[0, :].size()[0];
       neuron =  data[1, :];
+      print(neuron.max())
       shift_size = self.shift_indices.size()[0];
       new_size = spike_max_amplitude_index_size * shift_size;
       shifted_data = torch.zeros([2, new_size], dtype=torch.int)
@@ -293,8 +294,9 @@ class ShiftData(object):
         temp[0, :] = temp[0, :] + self.shift_indices[i];
         iter_to = iter_from + temp[0, :].size()[0];
         shifted_data[:, iter_from:iter_to] = temp;
+
         iter_from = iter_to;
-        
+        #print(temp[1, :].max())  
       # out of bound check
       non_out_of_bound_index = np.where((shifted_data[0, :] - waveform_div >= 0) & (shifted_data[0, :] + waveform_div < self.recording_length));
       shifted_data = shifted_data[:, non_out_of_bound_index[0]];
@@ -371,23 +373,23 @@ class SpikeTrainDataset(Dataset):
     shift_indexes - int tensor of indices to shift original position of spike
     flip_data_horizontal - flip data horizontally
     flip_data_vertical - flip_data vertically by changing value sign
+    transform_list - transforms for recording
 """
 def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
                 snr_ratio_db=None, shift_indexes = torch.IntTensor(),
-                flip_data_horizontal = False):
+                flip_data_horizontal = False,
+                flip_data_vertical = False,
+                transform_list = []):
   
   transform_list_recording = [];
   # adds noise
   if (snr_ratio_db != None):
     transform_list_recording.append(Awgn(snr_ratio_db));
-  # adds noise and mean, std normalization normalization transform
-  transform_list_recording.append(FilterSignalUsingButtersWorth('high', 24000, np.array([100], dtype=int), 1));
 
-  transform_list_recording.append(OptimizedZScoreNormalizaton());
-
+  transform_list_recording.extend(transform_list);
   transform = transforms.Compose(transform_list_recording);
   recording = Recording(path_to_recording, transform = transform);
-  
+  print(transform_list_recording)
   # shifts data
   if (shift_indexes.nelement() != 0):
     transform = transforms.Compose([ShiftData(shift_indexes, recording.__len__(), waveform_length)]);
@@ -403,6 +405,8 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
     transform = transforms.Compose([FlipData([2])]);
     waveforms = transform(waveforms);
 
+  if (flip_data_vertical == True):
+    waveforms = -1 * wavefroms;
   dataset = SpikeTrainDataset(waveforms, ground_truth.data[1, :])
   return dataset;
 
@@ -412,13 +416,20 @@ def AugmentData(path_to_recording, path_to_ground_truth, waveform_length,
     normalization_range - data range to normalize from ... to
     waveform_length - waveform length to be extracted
     max_dataset_size - dataset size of recording, can be little bit bigger than max
+    snr_from - snr ratio to augment from (rnd init)
+    snr_to - snr ratio to augment 
+    max_shift - +- indices to shift spike
+    use_horizontal_flip - use horizontal flip for augmentation
+    use_vertical_flip - use vertical flip for augmentation
+    transform_list - transforms list for recording
 """
-def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, max_dataset_size):
+
+def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, max_dataset_size,
+                    snr_from, snr_to, max_shift, use_horizontal_flip, use_vertical_flip, transform_list = []):
   i = 0;
-  snr_from = 3;
-  snr_to = 30
+  #snr_from = 20;
+  #snr_to = 100;
   dataset = SpikeTrainDataset();
-  max_shift = waveform_length  // 4 # +- shift
 
   while(dataset.__len__() < max_dataset_size):
     print("=" * 10, i + 1, "generation", "=" * 10)
@@ -432,7 +443,7 @@ def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, ma
     # calculates shift from __ to
     shift_from = - 1 * max_shift;
     shift_to = max_shift + 1;
-    shift_step = np.random.randint(1, 5);
+    shift_step = np.random.randint(1, 2);
     shift_indexes = torch.tensor(np.arange(shift_from, shift_to, shift_step)).int();
 
 
@@ -442,11 +453,17 @@ def GenerateDataset(path_to_recording, path_to_ground_truth, waveform_length, ma
     print("shift_step: ", shift_step)
     print("shift_indexes: ", shift_indexes)
     print("snr_ratio: ", snr_ratio_db)
-    flip_data_horizontal = np.random.randint(0, 2)
+    flip_data_horizontal = 0;
+    if (use_horizontal_flip):
+      flip_data_horizontal = np.random.randint(0, 2);
+
+    flip_data_vertical = 0;
+    if (use_vertical_flip):
+      flip_data_vertical = np.random.randint(0, 2);
 
     print("flip_data_horz: ", flip_data_horizontal)
     # generates flipped data
-    temp = AugmentData(path_to_recording, path_to_ground_truth, waveform_length, snr_ratio_db = snr_ratio_db, shift_indexes = shift_indexes, flip_data_horizontal = flip_data_horizontal);
+    temp = AugmentData(path_to_recording, path_to_ground_truth, waveform_length, snr_ratio_db = snr_ratio_db, shift_indexes = shift_indexes, flip_data_horizontal = flip_data_horizontal, flip_data_vertical = flip_data_vertical, transform_list = transform_list);
 
     dataset = torch.utils.data.ConcatDataset((dataset, temp));
     print("dataset len: ", dataset.__len__());

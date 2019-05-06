@@ -56,7 +56,9 @@ for i = 1:nb_of_recordings
     end
     
     spike_train = [index; neuron];
-
+    [C,ia,ic] = unique(neuron);
+    a_counts = accumarray(ic,1);
+    value_counts = [C'; a_counts]
 
     file_name_gd = "gt_" + i + ".npy";
     save_path_gd = fullfile(path_to_save, file_name_gd);

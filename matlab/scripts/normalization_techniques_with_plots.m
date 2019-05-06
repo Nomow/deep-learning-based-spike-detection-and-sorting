@@ -4,18 +4,17 @@ fs = 30000;
 step = 1000;
 nb_of_channels = size(micros2, 1);
 
-for i = 1:nb_of_channels
-    data = micros2(i, :, sess);
-    result1 = detect1(data, fs);
-    result2 = detect2(data, fs);
-    spikes = unique([result1, result2]);
+for i = 1:1
+    recording_synthesized = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/datasets_1.npy");
+    spikes = readNPY("/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets/ground_truth_data_multiunit_1.npy");
+    spikes = spikes+1;
     Fb=100;
     Fh = 6000
-   % [b,a]=butter(1,[2*Fb/fs], 'high');
-   [b,a]=butter(1,[2*Fb/fs 2*Fh/fs]); % femicro: sampling frequency (24kHz)
+    [b,a]=butter(1,[2*Fb/24000], 'high');
+   %[b,a]=butter(1,[2*Fb/fs 2*Fh/fs]); % femicro: sampling frequency (24kHz)
 
-    LFPh=filtfilt(b,a,data')';
-
+    LFPh=filtfilt(b,a,recording_synthesized(1:1400000)')';
+    spikes = spikes(find(spikes < 1400000));
     %%
     mov_mean = movmean(LFPh, step);
     mov_std = movstd(LFPh, step);
@@ -36,25 +35,27 @@ for i = 1:nb_of_channels
 
     figure
     title(string(i) + " channel")
-    subplot(4,1,1);
+    ax1 = subplot(4,1,1);
     plot(moving_z_score)
     hold
     plot(spikes, moving_z_score_pts, '*');
     
-    subplot(4,1,2);
+    ax2 = subplot(4,1,2);
     plot(moving_opt_z_score)
     hold
     plot(spikes, moving_opt_z_score_pts, '*'); 
     
-    subplot(4,1,3);
+    ax3 = subplot(4,1,3);
     plot(opt_zscore)
     hold
     plot(spikes, opt_zscore_pts, '*'); 
     
-    subplot(4,1,4);
+    ax4 = subplot(4,1,4);
     plot(zscore)
     hold
     plot(spikes, zscore_pts, '*'); 
+    
+    linkaxes([ax1 ,ax2, ax3, ax4],'xy');
 
 end
 
