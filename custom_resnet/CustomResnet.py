@@ -849,7 +849,7 @@ def weights_init_classifier(m):
 # Defines the new fc layer and classification layer
 # |--Linear--|--bn--|--relu--|--Linear--|
 class ClassBlock(nn.Module):
-    def __init__(self, input_dim, class_num, droprate, relu=False, bnorm=True, num_bottleneck=512, linear=True, return_f = False):
+    def __init__(self, input_dim, class_num, droprate, relu=False, bnorm=True, num_bottleneck=128, linear=True, return_f = False):
         super(ClassBlock, self).__init__()
         self.return_f = return_f
         add_block = []
@@ -905,3 +905,46 @@ class ft_net(nn.Module):
         x = x.view(x.size(0), x.size(1))
         x = self.model.fc(x)
         return x
+
+
+"""
+  softmax and treshold based prediction
+  result - cnn result
+  treshold - treshold to detect if its spike or not
+"""
+def PredictionByTreshold(result, treshold):
+  soft_max = nn.Softmax(1)
+  probability = soft_max(result)
+  prediction = torch.argmax(probability, 1);
+  for i  in range(prediction.nelement()):
+    if prediction[i] > 0:
+      score = probability[i, prediction[i]];
+      if(score < treshold):
+        prediction[i] = 0;
+  return prediction;
+
+  
+"""
+  Gets max amplitude of spikes so it doesn't overlap with other spikes
+  overlap is dfefined based on waveform_length, no 2 max amplitudes will be in +- waveform_length // 2 
+  recording - dataset recording
+  predictions - predicted indexes to be spikes
+  waveform_lengh - spike waveform length
+  waveform_indices - waveform indices of each detection window
+"""
+def GetNonOverlappingSpikesMaxAmplitude(recording, predictions, waveform_length, waveform_indices):
+    pred_ind = np.where(predictions == 1)[0];
+    waveform_start = waveform_indices[0, pred_ind] - waveform_length // 2;
+    waveform_argmax = np.argmax(abs(waveforms[pred_ind, :, :,]), axis=2);
+    predicted_index = np.unique(waveform_start + waveform_argmax.view(-1).to(torch.int32));
+    predicted_index1 = np.unique(waveform_start + waveform_argmax.view(-1).to(torch.int32));
+    difference = np.diff(predicted_index);
+    arg_min = np.argmin(difference);
+    val_min = np.min(difference)
+    while (val_min < waveform_length):
+        isuppr = np.argmin(abs(recording.data[0,predicted_index[arg_min:arg_min+2]]));
+        predicted_index = np.concatenate( ( predicted_index[:arg_min+isuppr], predicted_index[arg_min+isuppr+1:] ) )
+        difference = np.diff(predicted_index);
+        arg_min = np.argmin(difference);
+        val_min = np.min(difference)
+    return predicted_index;
