@@ -886,7 +886,7 @@ class ClassBlock(nn.Module):
 # Define the Resnet18-based Model
 class ft_net(nn.Module):
 
-    def __init__(self, class_num, layers, droprate=0.2):
+    def __init__(self, class_num, droprate=0.2):
         super(ft_net, self).__init__()
         model_ft = resnet18();
         self.model = model_ft
@@ -932,7 +932,7 @@ def PredictionByTreshold(result, treshold):
   waveform_lengh - spike waveform length
   waveform_indices - waveform indices of each detection window
 """
-def GetNonOverlappingSpikesMaxAmplitude(recording, predictions, waveform_length, waveform_indices):
+def GetNonOverlappingSpikesMaxAmplitude(recording, predictions, waveform_length, waveforms, waveform_indices):
     pred_ind = np.where(predictions == 1)[0];
     waveform_start = waveform_indices[0, pred_ind] - waveform_length // 2;
     waveform_argmax = np.argmax(abs(waveforms[pred_ind, :, :,]), axis=2);
