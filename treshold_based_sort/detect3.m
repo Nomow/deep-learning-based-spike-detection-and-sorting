@@ -1,9 +1,4 @@
-load('BOU_JO_Localizer6Hz_sessions','femicro','micros2');
-sess=1; % choose one of the two sessions
-dataset = [];
-for i =1 :size(micros2, 1)
-   dataset = [dataset, micros2(i, :, sess)];
-end
+function [result] = detect3(dataset,femicro)
 
 Fb=300;
 Fh=6000;

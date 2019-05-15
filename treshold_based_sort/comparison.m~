@@ -1,0 +1,6 @@
+
+for i = 46:94
+    gt_file = "/home/vtpc/Documents/Alvils/spike-sorting/data/synthesized/gt_" + string(i) +".npy";
+    data_file = "/home/vtpc/Documents/Alvils/spike-sorting/data/synthesized/data_" + string(i) +".npy";
+    data = readNPY(data_file);
+end
