@@ -687,7 +687,7 @@ def TresholdPredictBasedOnStd(result, treshold):
   shift_size = shift of each side of waveform_length Waveform_length - shift_size to Waveform_length + shift_size
 
 """
-def GetSpiketrainWaveformSequenceIndices(spike_train, waveform_length, shift_size=0):
+def GetSpiketrainWaveformSequenceIndices(spike_train, waveform_length, recording, shift_size=0):
   spike_positions = spike_train.data[0, :];
   spike_from = spike_positions - waveform_length // 2 - shift_size;
   spike_to = spike_positions + waveform_length // 2 + shift_size;
@@ -712,7 +712,9 @@ def GetNoiseIndices(path_to_recording, path_to_ground_truth, waveform_length, nb
   recording = Recording(path_to_recording);
   spike_train = GroundTruth(path_to_ground_truth);
   shift_size = waveform_length // 2 + waveform_length // 4;
-  spike_train_sequence = GetSpiketrainWaveformSequenceIndices(spike_train, waveform_length, shift_size=shift_size);
+  spike_train_sequence = GetSpiketrainWaveformSequenceIndices(spike_train, waveform_length, recording, shift_size=shift_size);
+  non_out_of_bound_index = np.where((spike_train_sequence >= 0) & (spike_train_sequence < recording.__len__()));
+  spike_train_sequence = spike_train_sequence[non_out_of_bound_index];
   noise_indexes_in_recording = torch.ones(recording.__len__());
   noise_indexes_in_recording[spike_train_sequence] = 0;
   noise_positions = torch.tensor(np.where(noise_indexes_in_recording == 1)[0]).int();
