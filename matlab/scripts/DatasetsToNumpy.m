@@ -36,25 +36,7 @@ for i = 1:nb_of_recordings
         index(to_remove) = [];
         neuron(to_remove) = [];
     end
-    
-    % removes waveforms which doesn't have centered max amplitude
-    to_remove = [];
-    over_treshold = round(waveform_length / 2 + waveform_length / 4)
-    under_treshold = round(waveform_length / 2 - waveform_length / 4)
-    for j = 1:length(index)
-        from = index(j) - waveform_length / 2;
-        to = index(j) + waveform_length / 2;
-        [~, argmax] = max(abs(data(1, from:to)));
-        if(argmax < under_treshold | argmax > over_treshold)
-            to_remove = [to_remove, j];
-        end
-    end
-    size(to_remove)
-    if(~isempty(to_remove))
-        index(to_remove) = [];
-        neuron(to_remove) = [];
-    end
-    
+
     spike_train = [index; neuron];
 
 

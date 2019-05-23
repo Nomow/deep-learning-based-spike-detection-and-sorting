@@ -1,5 +1,5 @@
 %% data loading
-path_to_data = "/home/vtpc/Documents/Alvils/spike-sorting/simulation_data/data";
+path_to_data = "/home/vtpc/Documents/Alvils/spike-sorting/raw/data";
 path_to_ground_truth = "/home/vtpc/Documents/Alvils/spike-sorting/simulation_data/ground_truth";
 path_to_save = "/home/vtpc/Documents/Alvils/spike-sorting/data/recording_datasets";
 recordings = LoadData(path_to_data);

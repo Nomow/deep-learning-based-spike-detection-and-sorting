@@ -196,9 +196,11 @@ class Recording(Dataset):
     transform - composed tranformations
     """
     
-    def __init__(self, path_to_data, device="cpu", transform=None):
-        data = np.load(path_to_data);
-        assert data.size > 0
+    def __init__(self, path_to_data="", device="cpu", transform=None):
+        if (path_to_data == ""):
+          data = np.empty([0]);
+        else:
+          data = np.load(path_to_data);
         self.data = torch.tensor(data).float().to(device);
         self.transform = transform
         if self.transform:
@@ -576,7 +578,8 @@ def GenerateTrainAndTestDataset(data, labels, divider):
   waveform_length - waveform length to be extracted
 """
 def AddPaddingToRecording(recording, step_size, waveform_length):
-  assert(recording.__len__() > waveform_length)
+  recording_cloned = Recording();
+
   recording_size = recording.__len__(); 
   nb_of_steps = (recording_size - waveform_length) // step_size
   #adds +1 nb_of_steps for padding purposes if nb of steps is not int
@@ -585,8 +588,8 @@ def AddPaddingToRecording(recording, step_size, waveform_length):
     nb_of_steps = nb_of_steps + 1;
     padding_size = (nb_of_steps * step_size + waveform_length) - recording_size
     padding = torch.zeros((1, padding_size), dtype=torch.float);
-    recording.data = torch.cat((recording.data, padding), 1)
-  return recording;
+    recording_cloned.data = torch.cat((recording.data, padding), 1)
+  return recording_cloned;
 
 import subprocess
 """Get the current gpu usage.
